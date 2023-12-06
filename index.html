@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Socket.IO chat</title>
+    <style>
+        body {
+            margin: 0;
+            padding-bottom: 3rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #form {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 0.25rem;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            height: 3rem;
+            box-sizing: border-box;
+            backdrop-filter: blur(10px);
+        }
+
+        #input {
+            border: none;
+            padding: 0 1rem;
+            flex-grow: 1;
+            border-radius: 2rem;
+            margin: 0.25rem;
+        }
+
+        #input:focus {
+            outline: none;
+        }
+
+        #form>button {
+            background: #333;
+            border: none;
+            padding: 0 1rem;
+            margin: 0.25rem;
+            border-radius: 3px;
+            outline: none;
+            color: #fff;
+        }
+
+        .usernameBox {
+            padding: 0.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 100%;
+            background-color: #E0E0E0;
+            padding: 1rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        #sidebar h2 {
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        #onlineUsers {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        #onlineUsers>li {
+            padding: 0.5rem;
+            border-bottom: 1px solid #ccc;
+        }
+
+        #messages {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        #messages>li {
+            padding: 0.5rem 1rem;
+        }
+
+        #messages>li:nth-child(odd) {
+            background: #efefef;
+        }
+
+        #typingStatus {
+            margin: 0.5rem 1rem;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="usernameBox" id="usernameBox">
+        <input type="text" id="usernameInput" placeholder="Enter your username">
+        <button onclick="setUsername()">Set Username</button>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <h2>Online Users:</h2>
+        <ul id="onlineUsers">
+        </ul>
+    </div>
+
+    <ul id="messages"></ul>
+    <form id="form" action="">
+        <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+
+    <p id="typingStatus"></p>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+
+        var socket = io();
+
+        var messages = document.getElementById('messages');
+        var form = document.getElementById('form');
+        var input = document.getElementById('input');
+
+        // Function to assign a username to a user
+        function setUsername() {
+            const username = document.getElementById('usernameInput').value;
+            socket.emit('setUsername', username);
+            const usernameBox = document.getElementById('usernameBox');
+
+            if (username.length > 0) {
+                usernameBox.classList.add('hidden');
+            }
+        }
+
+        // Eventlistener to send a chat message
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (input.value) {
+                socket.emit('chat message', input.value);
+                socket.emit('stopTyping');
+                input.value = '';
+            }
+        });
+
+        // Function to format and append a message
+        function appendMessage(msg) {
+            return `${msg}`;
+        }
+
+        // Handle chat messages
+        socket.on("chat message", (msg) => {
+            // Append the message directly to the sender's client without emitting to others
+            let item = document.createElement("li");
+            item.textContent = appendMessage(msg);
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+
+            // Use broadcast flag to send the message to everyone except the sender
+            socket.broadcast.emit("chat message", appendMessage(msg));
+
+            socket.emit('stopTyping'); // Stop typing when a message is sent
+        });
+
+        // Display a message when a user connects
+        socket.on('userJoined', (message) => {
+            console.log('User joined:', message);
+            let item = document.createElement('li');
+            item.textContent = message;
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        // Display a message when a user disconnects
+        socket.on('userLeft', (message) => {
+            console.log('User left:', message);
+            let item = document.createElement('li');
+            item.textContent = message;
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        // Listens for the updateOnlineUsers event and updates the list accordingly
+        socket.on('updateOnlineUsers', (onlineUsers) => {
+            const onlineUsersList = document.getElementById('onlineUsers');
+            onlineUsersList.innerHTML = ''; // Clear the existing list
+
+            onlineUsers.forEach((user) => {
+                const li = document.createElement('li');
+                li.textContent = user;
+                onlineUsersList.appendChild(li);
+            });
+        });
+
+        // Eventlistener that checks if a user is typing
+        input.addEventListener('input', () => {
+            if (input.value.trim() !== '') {
+                socket.emit('startTyping');
+            } else {
+                socket.emit('stopTyping');
+            }
+        });
+
+        // Handle updating typing status
+        socket.on('updateTypingStatus', (typingStatus) => {
+            const typingStatusElement = document.getElementById('typingStatus');
+            typingStatusElement.textContent = typingStatus;
+        });
+
+    </script>
+</body>
+
+</html>
