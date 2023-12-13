@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
 const connectedUsers = {};
 const typingUsers = {};
 
-// Function to handle viewing online users
+// Function to handle viewing all online users
 function updateOnlineUsers() {
   const onlineUsers = Object.keys(connectedUsers);
   io.emit("updateOnlineUsers", onlineUsers);
